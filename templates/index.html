@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Merger</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f8ff;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 600px;
+        }
+        h1 {
+            color: #1e90ff;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .upload-form {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .file-input-container {
+            position: relative;
+            text-align: center;
+        }
+        .file-input {
+            display: none;
+        }
+        .file-label {
+            background-color: #1e90ff;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            display: inline-block;
+            transition: background-color 0.3s;
+        }
+        .file-label:hover {
+            background-color: #187bcd;
+        }
+        .submit-btn {
+            background-color: #1e90ff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        .submit-btn:hover {
+            background-color: #187bcd;
+        }
+        .selected-files {
+            margin-top: 10px;
+            color: #666;
+        }
+        .flash-messages {
+            margin-bottom: 20px;
+        }
+        .flash-message {
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        .error {
+            background-color: #ffebee;
+            color: #c62828;
+            border: 1px solid #ef9a9a;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>PDF Merger</h1>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="flash-message {{ category }}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <form class="upload-form" method="post" enctype="multipart/form-data">
+            <div class="file-input-container">
+                <label for="files" class="file-label">Choose PDF Files</label>
+                <input type="file" name="files[]" id="files" class="file-input" multiple accept=".pdf" onchange="updateFileList()">
+                <div id="fileList" class="selected-files"></div>
+            </div>
+            <button type="submit" class="submit-btn">Merge PDFs</button>
+        </form>
+    </div>
+
+    <script>
+        function updateFileList() {
+            const input = document.getElementById('files');
+            const fileList = document.getElementById('fileList');
+            fileList.innerHTML = Array.from(input.files)
+                .map(file => file.name)
+                .join('<br>');
+        }
+    </script>
+</body>
+</html> 
