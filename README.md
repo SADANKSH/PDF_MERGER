@@ -61,6 +61,6 @@ python app.py
 3. Use the "✕" button to remove any unwanted PDFs from the list
 4. The PDFs will be merged in the order shown in the list (from top to bottom)
 
-## License
+---
 
-This project is licensed under the MIT License - see the LICENSE file for details. 
+Created with ❤️ by SADANKSH GANGRADE - feel free to contact me for any questions or feedback! 
