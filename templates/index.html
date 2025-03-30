@@ -65,10 +65,6 @@
         .submit-btn:hover {
             background-color: #187bcd;
         }
-        .selected-files {
-            margin-top: 10px;
-            color: #666;
-        }
         .flash-messages {
             margin-bottom: 20px;
         }
@@ -81,6 +77,52 @@
             background-color: #ffebee;
             color: #c62828;
             border: 1px solid #ef9a9a;
+        }
+        .file-list-container {
+            margin-top: 20px;
+            border: 1px dashed #ccc;
+            border-radius: 5px;
+            padding: 10px;
+            min-height: 100px;
+            background-color: #f9f9f9;
+        }
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            margin: 5px 0;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            cursor: move;
+        }
+        .file-item:hover {
+            background-color: #f0f0f0;
+        }
+        .drag-handle {
+            cursor: grab;
+            color: #666;
+            margin-right: 10px;
+        }
+        .file-name {
+            flex-grow: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .remove-file {
+            color: #ff4136;
+            cursor: pointer;
+            padding: 2px 8px;
+            border-radius: 3px;
+        }
+        .remove-file:hover {
+            background-color: #ffebee;
+        }
+        .no-files-message {
+            color: #999;
+            text-align: center;
+            padding: 20px;
         }
     </style>
 </head>
@@ -100,23 +142,171 @@
             {% endif %}
         {% endwith %}
 
-        <form class="upload-form" method="post" enctype="multipart/form-data">
+        <form class="upload-form" method="post" enctype="multipart/form-data" id="pdfForm">
             <div class="file-input-container">
                 <label for="files" class="file-label">Choose PDF Files</label>
-                <input type="file" name="files[]" id="files" class="file-input" multiple accept=".pdf" onchange="updateFileList()">
-                <div id="fileList" class="selected-files"></div>
+                <input type="file" name="files[]" id="files" class="file-input" multiple accept=".pdf" onchange="handleFileSelect(event)">
             </div>
-            <button type="submit" class="submit-btn">Merge PDFs</button>
+            
+            <div class="file-list-container" id="fileListContainer">
+                <div class="no-files-message" id="noFilesMessage">No files selected. Add PDFs to arrange and merge them.</div>
+                <div id="sortableFileList"></div>
+            </div>
+            
+            <input type="hidden" id="fileOrder" name="fileOrder">
+            <button type="submit" class="submit-btn" id="mergeButton" disabled>Merge PDFs</button>
         </form>
     </div>
 
     <script>
+        // Store file objects
+        let selectedFiles = [];
+        
+        function handleFileSelect(event) {
+            const newFiles = Array.from(event.target.files);
+            
+            // Add new files to our array
+            for (const file of newFiles) {
+                if (file.type === 'application/pdf') {
+                    // Check if the file is already in the list (by name)
+                    if (!selectedFiles.some(f => f.name === file.name)) {
+                        selectedFiles.push(file);
+                    }
+                }
+            }
+            
+            updateFileList();
+            
+            // Reset the file input so the same file can be added again if needed
+            document.getElementById('files').value = '';
+        }
+        
         function updateFileList() {
-            const input = document.getElementById('files');
-            const fileList = document.getElementById('fileList');
-            fileList.innerHTML = Array.from(input.files)
-                .map(file => file.name)
-                .join('<br>');
+            const fileListElement = document.getElementById('sortableFileList');
+            const noFilesMessage = document.getElementById('noFilesMessage');
+            const mergeButton = document.getElementById('mergeButton');
+            
+            // Clear the current list
+            fileListElement.innerHTML = '';
+            
+            if (selectedFiles.length > 0) {
+                noFilesMessage.style.display = 'none';
+                mergeButton.disabled = false;
+                
+                // Add each file to the list
+                selectedFiles.forEach((file, index) => {
+                    const fileItem = document.createElement('div');
+                    fileItem.className = 'file-item';
+                    fileItem.draggable = true;
+                    fileItem.dataset.index = index;
+                    
+                    fileItem.innerHTML = `
+                        <span class="drag-handle">&#9776;</span>
+                        <span class="file-name">${file.name}</span>
+                        <span class="remove-file" onclick="removeFile(${index})">✕</span>
+                    `;
+                    
+                    // Add drag events
+                    fileItem.addEventListener('dragstart', handleDragStart);
+                    fileItem.addEventListener('dragover', handleDragOver);
+                    fileItem.addEventListener('drop', handleDrop);
+                    fileItem.addEventListener('dragend', handleDragEnd);
+                    
+                    fileListElement.appendChild(fileItem);
+                });
+            } else {
+                noFilesMessage.style.display = 'block';
+                mergeButton.disabled = true;
+            }
+            
+            updateFileOrderInput();
+        }
+        
+        function removeFile(index) {
+            selectedFiles.splice(index, 1);
+            updateFileList();
+        }
+        
+        // Drag and drop functionality
+        let dragSrcElement = null;
+        
+        function handleDragStart(e) {
+            dragSrcElement = this;
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/html', this.outerHTML);
+            this.style.opacity = '0.4';
+        }
+        
+        function handleDragOver(e) {
+            if (e.preventDefault) {
+                e.preventDefault();
+            }
+            e.dataTransfer.dropEffect = 'move';
+            return false;
+        }
+        
+        function handleDrop(e) {
+            if (e.stopPropagation) {
+                e.stopPropagation();
+            }
+            
+            if (dragSrcElement !== this) {
+                const srcIndex = parseInt(dragSrcElement.dataset.index);
+                const destIndex = parseInt(this.dataset.index);
+                
+                // Rearrange the files array
+                const [movedFile] = selectedFiles.splice(srcIndex, 1);
+                selectedFiles.splice(destIndex, 0, movedFile);
+                
+                updateFileList();
+            }
+            
+            return false;
+        }
+        
+        function handleDragEnd(e) {
+            this.style.opacity = '1';
+        }
+        
+        function updateFileOrderInput() {
+            // Create a FormData object when submitting
+            document.getElementById('pdfForm').onsubmit = function(e) {
+                e.preventDefault();
+                
+                const formData = new FormData();
+                
+                // Add files in the current order
+                selectedFiles.forEach(file => {
+                    formData.append('files[]', file);
+                });
+                
+                // Use fetch to submit the form
+                fetch('/', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (response.ok) {
+                        return response.blob();
+                    }
+                    throw new Error('Network response was not ok.');
+                })
+                .then(blob => {
+                    // Create download link for the merged PDF
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = 'merged.pdf';
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('There was an error merging the PDF files. Please try again.');
+                });
+            };
         }
     </script>
 </body>

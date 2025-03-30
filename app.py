@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, send_file, flash
+from flask import Flask, render_template, request, send_file, flash, jsonify
 from werkzeug.utils import secure_filename
 import os
 from PyPDF2 import PdfMerger
@@ -25,6 +25,8 @@ def upload_file():
     if request.method == 'POST':
         # Check if any file was uploaded
         if 'files[]' not in request.files:
+            if request.headers.get('Accept') == 'application/json':
+                return jsonify({'error': 'No files selected'}), 400
             flash('No files selected', 'error')
             return render_template('index.html')
         
@@ -32,11 +34,15 @@ def upload_file():
         
         # Check if user selected files
         if not files or files[0].filename == '':
+            if request.headers.get('Accept') == 'application/json':
+                return jsonify({'error': 'No files selected'}), 400
             flash('No files selected', 'error')
             return render_template('index.html')
         
         # Check if all files are PDFs
         if not all(allowed_file(f.filename) for f in files):
+            if request.headers.get('Accept') == 'application/json':
+                return jsonify({'error': 'Please upload only PDF files'}), 400
             flash('Please upload only PDF files', 'error')
             return render_template('index.html')
         
@@ -45,13 +51,18 @@ def upload_file():
             
             # Create a temporary directory for processing
             with tempfile.TemporaryDirectory() as temp_dir:
-                # Save and merge all files
+                # Save all files - the order in the request.files list is the order we'll use for merging
+                temp_filepaths = []
                 for file in files:
                     if file and allowed_file(file.filename):
                         filename = secure_filename(file.filename)
                         filepath = os.path.join(temp_dir, filename)
                         file.save(filepath)
-                        merger.append(filepath)
+                        temp_filepaths.append(filepath)
+                
+                # Append files in the order they were received
+                for filepath in temp_filepaths:
+                    merger.append(filepath)
                 
                 # Save the merged PDF
                 output_path = os.path.join(app.config['UPLOAD_FOLDER'], 'merged.pdf')
@@ -62,7 +73,10 @@ def upload_file():
                 return send_file(output_path, as_attachment=True, download_name='merged.pdf')
                 
         except Exception as e:
-            flash(f'An error occurred: {str(e)}', 'error')
+            error_msg = f'An error occurred: {str(e)}'
+            if request.headers.get('Accept') == 'application/json':
+                return jsonify({'error': error_msg}), 500
+            flash(error_msg, 'error')
             return render_template('index.html')
             
     return render_template('index.html')
